@@ -1,0 +1,101 @@
+### Closira API — Test Requests
+### Use the REST Client extension in VS Code to run these,
+### or copy the curl equivalents below each request.
+
+@baseUrl = http://localhost:8000
+
+# =============================================================================
+# 1. HEALTH CHECK
+# =============================================================================
+
+### Check API and database health
+GET {{baseUrl}}/health
+
+# curl equivalent:
+# curl -X GET http://localhost:8000/health
+
+
+# =============================================================================
+# 2. CREATE ENQUIRY — Booking (will match "Booking Enquiry" SOP)
+# =============================================================================
+
+### Create a booking enquiry via WhatsApp
+# @name createEnquiry
+POST {{baseUrl}}/enquiry/
+Content-Type: application/json
+
+{
+  "customer_name": "Sarah Mitchell",
+  "channel": "whatsapp",
+  "message": "Hi, I'd like to book an appointment for next Monday if possible."
+}
+
+# curl equivalent:
+# curl -X POST http://localhost:8000/enquiry/ \
+#   -H "Content-Type: application/json" \
+#   -d '{"customer_name": "Sarah Mitchell", "channel": "whatsapp", "message": "Hi, I would like to book an appointment for next Monday if possible."}'
+
+
+# =============================================================================
+# 3. CREATE ENQUIRY — Pricing (will match "Pricing Question" SOP)
+# =============================================================================
+
+### Create a pricing enquiry via email
+POST {{baseUrl}}/enquiry/
+Content-Type: application/json
+
+{
+  "customer_name": "James Okafor",
+  "channel": "email",
+  "message": "Hello, could you send me a quote for your premium package? I want to understand the pricing before committing."
+}
+
+
+# =============================================================================
+# 4. CREATE ENQUIRY — No SOP match (will auto-escalate)
+# =============================================================================
+
+### Create an enquiry that won't match any SOP — triggers auto-escalation
+POST {{baseUrl}}/enquiry/
+Content-Type: application/json
+
+{
+  "customer_name": "Priya Sharma",
+  "channel": "call",
+  "message": "xyz random message that doesn't match any sop keywords at all"
+}
+
+
+# =============================================================================
+# 5. GET HISTORY — Replace {id} with an ID from step 2/3/4
+# =============================================================================
+
+### Get full history for an enquiry (replace the ID below)
+GET {{baseUrl}}/enquiry/REPLACE_WITH_ENQUIRY_ID/history
+
+
+# =============================================================================
+# 6. SCHEDULE FOLLOW-UP — Replace {id} with a valid enquiry ID
+# =============================================================================
+
+### Schedule a follow-up 60 minutes from now
+POST {{baseUrl}}/enquiry/REPLACE_WITH_ENQUIRY_ID/followup
+Content-Type: application/json
+
+{
+  "delay_minutes": 60,
+  "message_template": "Hi {name}, just checking in — is there anything else we can help with?"
+}
+
+
+# =============================================================================
+# 7. ESCALATE — Replace {id} with a valid enquiry ID
+# =============================================================================
+
+### Manually escalate an enquiry
+POST {{baseUrl}}/enquiry/REPLACE_WITH_ENQUIRY_ID/escalate
+Content-Type: application/json
+
+{
+  "reason": "Customer is very frustrated and has specifically requested to speak with a manager."
+}
