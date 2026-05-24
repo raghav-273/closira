@@ -1,8 +1,40 @@
-# Closira — Engineering Intern Assignment
+<div align="center">
 
-A full-stack implementation of Closira's customer enquiry-handling platform, built as part of the engineering intern assessment.
+<img src="https://img.shields.io/badge/Closira-Enquiry%20Platform-6C63FF?style=for-the-badge&logoColor=white" alt="Closira" />
 
-> **What's included:** A FastAPI backend with async SOP matching + a React Native mobile dashboard — two separate, independently runnable projects in a single repo.
+<h3>AI-Powered Customer Enquiry Handling — Full Stack Internship Assignment</h3>
+
+<p>A production-inspired backend API and mobile dashboard built for Closira's SMB communication platform.</p>
+
+<p>
+  <img src="https://img.shields.io/badge/Python-3.9+-3776AB?style=flat-square&logo=python&logoColor=white" />
+  <img src="https://img.shields.io/badge/FastAPI-0.111-009688?style=flat-square&logo=fastapi&logoColor=white" />
+  <img src="https://img.shields.io/badge/SQLAlchemy-2.0-D71F00?style=flat-square&logo=sqlalchemy&logoColor=white" />
+  <img src="https://img.shields.io/badge/React_Native-0.74-61DAFB?style=flat-square&logo=react&logoColor=black" />
+  <img src="https://img.shields.io/badge/Expo-51-000020?style=flat-square&logo=expo&logoColor=white" />
+  <img src="https://img.shields.io/badge/SQLite-embedded-003B57?style=flat-square&logo=sqlite&logoColor=white" />
+</p>
+
+<p>
+  <img src="https://img.shields.io/badge/Backend-REST%20API%20%2B%20Async%20Worker-success?style=flat-square" />
+  <img src="https://img.shields.io/badge/Frontend-Mobile%20Dashboard-blueviolet?style=flat-square" />
+  <img src="https://img.shields.io/badge/Docs-Swagger%20UI-85EA2D?style=flat-square&logo=swagger&logoColor=black" />
+</p>
+
+</div>
+
+---
+
+## What This Is
+
+Closira is an AI-powered communication platform that handles inbound customer enquiries across WhatsApp, email, and phone for small and medium businesses.
+
+This repository contains two fully working projects built as part of the engineering intern assessment:
+
+- **Backend** — A FastAPI REST API that receives inbound enquiries, matches them against SOPs asynchronously using a background worker, and exposes status and history endpoints.
+- **Frontend** — A React Native mobile dashboard (built with Expo) where business owners monitor conversations, manage escalations, and track follow-ups.
+
+Both are independently runnable. No Docker. No external services. Works out of the box.
 
 ---
 
@@ -10,331 +42,315 @@ A full-stack implementation of Closira's customer enquiry-handling platform, bui
 
 ```
 closira/
-├── backend/          ← Python + FastAPI REST API + async worker
-└── frontend/         ← React Native (Expo) mobile dashboard
+├── backend/                        # Python + FastAPI
+│   ├── app/
+│   │   ├── api/
+│   │   │   ├── enquiries.py        # All 4 enquiry endpoints
+│   │   │   └── health.py           # Health check endpoint
+│   │   ├── core/
+│   │   │   ├── database.py         # SQLAlchemy engine + session factory
+│   │   │   ├── logger.py           # Structured JSON logger
+│   │   │   └── sop_engine.py       # Keyword-based SOP matcher
+│   │   ├── models/
+│   │   │   └── enquiry.py          # ORM models (Enquiry + EnquiryEvent)
+│   │   ├── schemas/
+│   │   │   └── enquiry.py          # Pydantic request/response schemas
+│   │   ├── workers/
+│   │   │   └── processor.py        # Async background task
+│   │   └── main.py                 # App entry point, middleware, routers
+│   ├── api_tests.http              # VS Code REST Client test file
+│   └── requirements.txt
+│
+└── frontend/                       # React Native + Expo
+    ├── src/
+    │   ├── components/
+    │   │   ├── common/             # ChannelBadge, StatusBadge, EmptyState
+    │   │   ├── dashboard/          # StatCard, ActivityItem
+    │   │   ├── leads/              # LeadCard
+    │   │   ├── escalations/        # EscalationCard
+    │   │   └── followups/          # FollowUpCard
+    │   ├── screens/                # 5 screens
+    │   ├── navigation/             # Bottom tab + stack navigator
+    │   ├── mock/                   # Realistic mock data (API-ready structure)
+    │   └── utils/                  # theme.js (design tokens) + helpers.js
+    ├── App.js
+    └── package.json
 ```
 
 ---
 
-## Quick Start
+## Backend
 
-### Backend (5 minutes)
+### Running Locally
+
+> **Requires:** Python 3.9+
+
 ```bash
 cd backend
+
+# Create and activate a virtual environment
 python -m venv venv
 source venv/bin/activate        # Windows: venv\Scripts\activate
+
+# Install dependencies
 pip install -r requirements.txt
+
+# Start the server (hot-reloads on file save)
 uvicorn app.main:app --reload
 ```
-API runs at **http://localhost:8000** · Docs at **http://localhost:8000/docs**
 
-### Frontend (5 minutes)
-```bash
-cd frontend
-npm install
-npx expo start
-```
-Scan the QR code with the **Expo Go** app (iOS/Android) or press `w` for browser.
+The server starts at **http://localhost:8000**
+
+Interactive API docs (Swagger UI): **http://localhost:8000/docs**
+
+The SQLite database file (`closira.db`) is created automatically on first startup. Delete it to reset all data.
 
 ---
 
+### API Endpoints
+
+| Method | Endpoint | Status | Description |
+|--------|----------|--------|-------------|
+| `GET` | `/health` | `200` | API and database health check |
+| `POST` | `/enquiry/` | `202` | Create a new inbound customer enquiry |
+| `POST` | `/enquiry/{id}/followup` | `200` | Schedule a follow-up (accepts delay in minutes) |
+| `POST` | `/enquiry/{id}/escalate` | `200` | Escalate to a human agent with reason |
+| `GET` | `/enquiry/{id}/history` | `200` | Full conversation history and status timeline |
+
+All endpoints return meaningful HTTP status codes. Bad input returns `422` with a clear message. Missing records return `404`. Nothing unhandled reaches the client.
+
 ---
 
-# Part 1 — Backend
+### How the Pipeline Works
 
-## 1.1 What It Does
-
-The backend simulates Closira's core enquiry pipeline:
-
-1. A customer message arrives via POST `/enquiry` (WhatsApp, email, or call)
-2. The API returns a job ID **immediately** — it does not block
-3. A background task picks up the enquiry, matches it against 5 hardcoded SOPs using keyword logic, and updates the record
-4. If no SOP matches, the enquiry is auto-escalated for human review
-5. Business staff can manually follow up, escalate, or read the full history via the other endpoints
-
-## 1.2 API Endpoints
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET`  | `/health` | API and database health check |
-| `POST` | `/enquiry/` | Create a new inbound customer enquiry |
-| `POST` | `/enquiry/{id}/followup` | Schedule a follow-up (accepts delay in minutes) |
-| `POST` | `/enquiry/{id}/escalate` | Manually escalate to a human agent |
-| `GET`  | `/enquiry/{id}/history` | Full conversation history + status timeline |
-
-Full interactive docs with example payloads are at `/docs` (Swagger UI) and `/redoc`.
-
-## 1.3 Running the Backend
-
-**Prerequisites:** Python 3.9+
-
-```bash
-cd backend
-
-# 1. Create and activate a virtual environment
-python -m venv venv
-source venv/bin/activate          # Windows: venv\Scripts\activate
-
-# 2. Install dependencies
-pip install -r requirements.txt
-
-# 3. Start the server (hot-reloads on file changes)
-uvicorn app.main:app --reload
-
-# 4. Open the interactive docs
-open http://localhost:8000/docs
+```
+Customer Message
+      │
+      ▼
+POST /enquiry/  ──── returns job_id immediately (202 Accepted)
+      │
+      ▼
+Background Task starts (FastAPI BackgroundTasks)
+      │
+      ├── Opens its own DB session
+      ├── Sets status = "processing"
+      ├── Runs SOP keyword matcher against message
+      │
+      ├── Match found?
+      │     ├── YES → sets matched_sop + suggested_response, status = "open"
+      │     └── NO  → auto-escalates, status = "escalated"
+      │
+      └── Logs every state change as an immutable EnquiryEvent
 ```
 
-The SQLite database file (`closira.db`) is created automatically on first startup. Delete it to start fresh.
+---
 
-## 1.4 Testing the API
+### SOP Matching Engine
 
-Open `api_tests.http` in VS Code with the **REST Client** extension and run each request in order.
+The SOP engine (`core/sop_engine.py`) matches inbound messages against 5 predefined Standard Operating Procedures using keyword detection. Messages are normalised (lowercased, punctuation stripped) before matching, so `"Booking??"` and `"booking"` both trigger the same SOP.
 
-Or use curl:
+| SOP | Trigger Keywords |
+|-----|-----------------|
+| Booking Enquiry | book, schedule, appointment, reserve, availability, slot |
+| Pricing Question | price, cost, quote, how much, fee, rates, budget |
+| Complaint | complaint, unhappy, issue, problem, refund, angry, frustrated |
+| After-Hours Message | urgent, emergency, asap, tonight, midnight |
+| General Info | info, details, service, product, hours, location, address |
 
-```bash
-# Health check
-curl http://localhost:8000/health
+If no SOP matches, the enquiry is automatically escalated for human review and logged accordingly.
 
-# Create a booking enquiry
-curl -X POST http://localhost:8000/enquiry/ \
-  -H "Content-Type: application/json" \
-  -d '{"customer_name": "Sarah Mitchell", "channel": "whatsapp", "message": "I would like to book an appointment for Monday."}'
+In a production system this would be replaced with an LLM call or a trained text classifier. The engine is isolated in its own module precisely so it can be swapped without touching any other file.
 
-# The response includes a job_id — use it in the next commands
-# Replace ENQUIRY_ID below with the id from the response above
+---
 
-# Get full history
-curl http://localhost:8000/enquiry/ENQUIRY_ID/history
+### Database Schema
 
-# Schedule a follow-up
-curl -X POST http://localhost:8000/enquiry/ENQUIRY_ID/followup \
-  -H "Content-Type: application/json" \
-  -d '{"delay_minutes": 60}'
+Two tables. Both use UUID primary keys.
 
-# Escalate
-curl -X POST http://localhost:8000/enquiry/ENQUIRY_ID/escalate \
-  -H "Content-Type: application/json" \
-  -d '{"reason": "Customer is requesting a manager."}'
-```
-
-## 1.5 Database Schema
-
-**Table: `enquiries`**
+**`enquiries`** — one row per inbound message
 
 | Column | Type | Notes |
 |--------|------|-------|
 | `id` | TEXT (UUID) | Primary key, auto-generated |
-| `customer_name` | TEXT | Required |
-| `channel` | ENUM | `whatsapp`, `email`, `call` |
+| `customer_name` | TEXT | Max 120 chars |
+| `channel` | ENUM | `whatsapp` · `email` · `call` |
 | `message` | TEXT | Raw inbound message |
-| `status` | ENUM | `pending` → `processing` → `open` / `escalated` |
-| `matched_sop` | TEXT (nullable) | Populated by background task |
-| `suggested_response` | TEXT (nullable) | AI-generated response from matched SOP |
-| `escalation_reason` | TEXT (nullable) | Set on manual or auto-escalation |
-| `followup_due_at` | DATETIME (nullable) | Scheduled follow-up time |
-| `followup_message` | TEXT (nullable) | Personalised follow-up message |
-| `created_at` | DATETIME | UTC timestamp |
-| `updated_at` | DATETIME | Auto-updated on every write |
+| `status` | ENUM | `pending` → `processing` → `open` / `escalated` / `resolved` |
+| `matched_sop` | TEXT | Set by background task, nullable |
+| `suggested_response` | TEXT | Canned response for matched SOP, nullable |
+| `escalation_reason` | TEXT | Set on manual or auto-escalation, nullable |
+| `followup_due_at` | DATETIME | UTC, nullable |
+| `followup_message` | TEXT | Personalised message, nullable |
+| `created_at` | DATETIME | UTC, set on insert |
+| `updated_at` | DATETIME | UTC, auto-updated on every write |
 
-**Table: `enquiry_events`** *(append-only timeline)*
+**`enquiry_events`** — append-only status timeline
 
 | Column | Type | Notes |
 |--------|------|-------|
 | `id` | TEXT (UUID) | Primary key |
 | `enquiry_id` | TEXT (FK) | References `enquiries.id` |
-| `event_type` | ENUM | `created`, `processing_started`, `sop_matched`, `escalated`, etc. |
-| `description` | TEXT | Human-readable description of what happened |
-| `created_at` | DATETIME | UTC timestamp |
+| `event_type` | ENUM | `created` · `processing_started` · `sop_matched` · `escalated` · `follow_up_scheduled` · `resolved` |
+| `description` | TEXT | Human-readable description |
+| `created_at` | DATETIME | UTC, set on insert |
 
-The events table is intentionally append-only — we never update or delete rows. This gives us a full audit trail and powers the history endpoint without any additional query complexity.
-
-## 1.6 Async Processing: BackgroundTasks vs Celery
-
-**Decision: FastAPI BackgroundTasks**
-
-For this prototype, `BackgroundTasks` is the right tool:
-
-| | BackgroundTasks | Celery |
-|---|---|---|
-| **Setup** | Zero extra dependencies | Requires Redis/RabbitMQ broker + separate worker process |
-| **Visibility** | Task runs in same process | Tasks run in separate worker, visible in Flower dashboard |
-| **Persistence** | Lost on server restart | Persists across restarts |
-| **Scalability** | Tied to API process | Horizontally scalable |
-
-**When to switch to Celery:** In production, if the API is handling hundreds of concurrent enquiries, or if tasks need retry logic (e.g. external API calls that might fail), Celery is the right call. The SOP matching logic is already isolated in `workers/processor.py` — moving it to a Celery task would require changing only the task invocation in `api/enquiries.py`, not the matching logic itself.
-
-## 1.7 Database Choice: SQLite vs PostgreSQL
-
-**Decision: SQLite**
-
-For a prototype that runs on a single machine with no Docker dependency, SQLite is ideal:
-- Zero setup — just a file
-- No credentials, no connection strings, no migrations to run
-- Easily inspectable with any SQLite browser (DB Browser for SQLite is free)
-
-**In production:** Swap `DATABASE_URL` in `core/database.py` to a Postgres connection string. SQLAlchemy abstracts the driver — nothing else in the codebase changes.
-
-## 1.8 SOP Definitions
-
-Five SOPs are defined in `core/sop_engine.py`:
-
-| SOP | Trigger Keywords |
-|-----|-----------------|
-| Booking Enquiry | book, schedule, appointment, reserve, availability |
-| Pricing Question | price, cost, quote, how much, fee, rates |
-| Complaint | complaint, unhappy, issue, problem, refund, angry |
-| After-Hours Message | urgent, emergency, asap, tonight, midnight |
-| General Info | info, details, service, product, hours, location |
-
-If none match, the enquiry is auto-escalated and flagged for manual review.
-
-## 1.9 Known Limitations / Trade-offs
-
-- **No authentication:** In production, every endpoint would require a bearer token. Skipped here to keep the focus on the pipeline logic.
-- **No tenant isolation:** The schema has no `business_id` field. Real Closira would be multi-tenant; adding a `business_id` FK to `enquiries` and filtering every query by it would be the first production change.
-- **BackgroundTasks + SQLite threading:** SQLite's write locking can cause occasional delays under concurrent load. Acceptable for a prototype, not for production.
-- **SOP matching is naive:** Real Closira would use an LLM or a trained text classifier. The keyword approach is transparent, testable, and easy to swap out.
-- **No follow-up scheduler:** The follow-up endpoint stores a `followup_due_at` timestamp but doesn't actually send a message at that time. A Celery beat scheduler or a cron job reading the DB would handle this in production.
+The events table is intentionally immutable — rows are only ever inserted, never updated or deleted. This gives a complete audit trail without any extra query complexity and directly powers the `/history` endpoint.
 
 ---
 
+### Design Decisions & Trade-offs
+
+**BackgroundTasks vs Celery**
+
+I chose FastAPI's built-in `BackgroundTasks` over Celery for this prototype. Celery requires a running Redis or RabbitMQ broker, a separate worker process, and meaningful configuration overhead — none of which is justified for a single-machine prototype.
+
+The trade-off is persistence: if the server restarts while a task is running, the task is lost. In production, Celery + Redis would be the right call. The processing logic is fully isolated in `workers/processor.py`, so migrating to Celery later means changing exactly one line in the router.
+
+The background task opens its own `SessionLocal()` database session rather than reusing the request-scoped one. The request session is closed the moment the HTTP response is sent — reusing it would raise a `DetachedInstanceError`. This was a real bug found and fixed during development.
+
+**SQLite vs PostgreSQL**
+
+SQLite for the prototype. Zero setup, no credentials, works everywhere, and the single file is easy to inspect or reset. The `DATABASE_URL` in `core/database.py` is the only thing that changes when moving to Postgres — SQLAlchemy abstracts the rest.
+
+**Structured JSON logging**
+
+Every key event emits a JSON log line to stdout. JSON logs are grep-friendly, parseable by `jq`, and ingestible by any log aggregator (Datadog, CloudWatch, etc.) without parsing rules. Plain-text logs don't survive at scale.
+
 ---
 
-# Part 2 — Frontend
+### Testing the API
 
-## 2.1 What It Does
+Open `api_tests.http` in VS Code with the [REST Client extension](https://marketplace.visualstudio.com/items?itemName=humao.rest-client) and run each request in sequence. Or use curl:
 
-A React Native mobile app (built with Expo) that gives a business owner a full view of their Closira activity:
+```bash
+# 1. Health check
+curl http://localhost:8000/health
 
-| Screen | Purpose |
-|--------|---------|
-| **Dashboard** | Stats overview, quick actions, activity feed |
-| **Leads** | All inbound leads with filter tabs, tappable cards |
-| **Escalations** | Active escalation alerts with resolve action |
-| **Follow-ups** | Scheduled follow-up tasks with mark-as-done |
-| **Conversation Detail** | Full thread, SOP match, AI summary, status timeline |
+# 2. Create a booking enquiry
+curl -X POST http://localhost:8000/enquiry/ \
+  -H "Content-Type: application/json" \
+  -d '{"customer_name": "Sarah Mitchell", "channel": "whatsapp", "message": "I would like to book an appointment for Monday morning."}'
+# → returns job_id immediately
 
-## 2.2 Running the Frontend
+# 3. Fetch history (replace with actual job_id)
+curl http://localhost:8000/enquiry/{job_id}/history
+# → shows SOP matched, status = open
 
-**Prerequisites:** Node.js 18+, the **Expo Go** app on your phone (free on iOS/Android)
+# 4. Schedule a follow-up
+curl -X POST http://localhost:8000/enquiry/{job_id}/followup \
+  -H "Content-Type: application/json" \
+  -d '{"delay_minutes": 60, "message_template": "Hi {name}, just following up!"}'
+
+# 5. Escalate
+curl -X POST http://localhost:8000/enquiry/{job_id}/escalate \
+  -H "Content-Type: application/json" \
+  -d '{"reason": "Customer requested a manager."}'
+```
+
+---
+
+## Frontend
+
+### Running Locally
+
+> **Requires:** Node.js 18+ and the [Expo Go](https://expo.dev/go) app on your phone
 
 ```bash
 cd frontend
-
-# 1. Install dependencies
 npm install
-
-# 2. Start the Expo dev server
-npx expo start
-
-# 3. Scan the QR code in your terminal with:
-#    - iOS:     Camera app
-#    - Android: Expo Go app
-#    - Browser: Press 'w' in the terminal
-```
-
-## 2.3 Project Structure
-
-```
-frontend/
-├── App.js                          ← Root entry point
-└── src/
-    ├── navigation/
-    │   └── AppNavigator.jsx        ← Bottom tab + stack navigator
-    ├── screens/
-    │   ├── DashboardScreen.jsx
-    │   ├── LeadsScreen.jsx
-    │   ├── EscalationsScreen.jsx
-    │   ├── FollowUpsScreen.jsx
-    │   └── ConversationDetailScreen.jsx
-    ├── components/
-    │   ├── common/
-    │   │   ├── ChannelBadge.jsx    ← WhatsApp/Email/Call badge
-    │   │   ├── StatusBadge.jsx     ← New/Qualified/Escalated badge
-    │   │   └── EmptyState.jsx      ← Empty list placeholder
-    │   ├── dashboard/
-    │   │   ├── StatCard.jsx        ← Metric card with trend indicator
-    │   │   └── ActivityItem.jsx    ← Activity feed row
-    │   ├── leads/
-    │   │   └── LeadCard.jsx        ← Tappable lead card
-    │   ├── escalations/
-    │   │   └── EscalationCard.jsx  ← Escalation card with resolve button
-    │   └── followups/
-    │       └── FollowUpCard.jsx    ← Follow-up task card
-    ├── mock/
-    │   ├── enquiries.js            ← Realistic mock enquiry data
-    │   └── stats.js                ← Mock dashboard stats + activity feed
-    └── utils/
-        ├── theme.js                ← Design tokens (colours, spacing, fonts)
-        └── helpers.js              ← Date formatting, badge config utilities
-```
-
-## 2.4 Styling Choice: StyleSheet
-
-**Decision: React Native StyleSheet** (not NativeWind/Tailwind)
-
-Reasons:
-- No compiler or additional tooling required — works out of the box with Expo
-- Styles are co-located with components, making each file self-contained
-- `theme.js` provides the same single-source-of-truth benefit that Tailwind's config would
-- StyleSheet.create() gives a minor performance benefit via style ID caching on native
-
-**When NativeWind makes more sense:** Large teams where designers and developers share a Tailwind vocabulary, or projects with heavy responsive design requirements. For a focused prototype, the overhead isn't justified.
-
-## 2.5 Design Decisions
-
-- **Colour system:** Deep navy primary with purple accent, semantic colours for status and channels (green = WhatsApp, blue = email, amber = call)
-- **Consistent badges:** `ChannelBadge` and `StatusBadge` are used identically across every screen — changing a badge's colour means changing it in one place
-- **Empty states:** Every list has a `<EmptyState>` component with a contextual message — no blank screens
-- **Resolve / Mark Done:** Escalation and follow-up cards remove themselves from the list on action, giving immediate visual feedback without a backend round-trip
-
-## 2.6 Mock Data Design
-
-Mock data in `/src/mock/` is structured identically to what the backend API returns — same field names, same date formats, same enum values. This means replacing the mock import with a real `fetch()` call is the only change needed to wire up the real API.
-
-## 2.7 Known Limitations
-
-- **No real API integration:** All data is hardcoded in `/mock`. Adding `useEffect` + `fetch` to each screen would connect to the backend.
-- **No authentication:** A login screen and JWT storage would precede this in production.
-- **Badge counts are static:** The tab bar badge numbers are derived from mock data at app start and don't update when cards are resolved. A state management solution (Zustand or Context) would fix this.
-- **No push notifications:** Expo Notifications would handle real-time escalation alerts in production.
-
----
-
----
-
-# Combined: Running Both Together
-
-```bash
-# Terminal 1 — start the backend
-cd closira/backend
-source venv/bin/activate
-uvicorn app.main:app --reload
-
-# Terminal 2 — start the frontend
-cd closira/frontend
 npx expo start
 ```
 
-The frontend currently uses mock data. To point it at the real backend, replace the mock imports in each screen with `fetch('http://YOUR_LOCAL_IP:8000/...')` calls. Use your machine's local network IP (not `localhost`) so the Expo Go app on your phone can reach it.
+Scan the QR code in your terminal with the Expo Go app (iOS or Android). The app loads in about 30 seconds.
+
+**No phone?** Press `w` after starting — opens a web version in your browser.
 
 ---
 
-# Tech Stack
+### Screens
 
-| Layer | Technology | Why |
-|-------|-----------|-----|
-| Backend framework | FastAPI | Modern, fast, excellent DX, auto-docs |
-| Database | SQLite + SQLAlchemy | Zero setup, swap-in Postgres for prod |
-| Async tasks | FastAPI BackgroundTasks | Sufficient for prototype, no broker needed |
-| Validation | Pydantic v2 | First-class FastAPI integration |
-| Logging | Custom JSON formatter | Machine-parseable, production-ready format |
-| Mobile framework | React Native + Expo | Fast iteration, runs on iOS + Android |
-| Navigation | React Navigation v6 | Industry standard for RN |
-| Styling | StyleSheet + theme.js | No tooling overhead, consistent tokens |
+| Screen | Description |
+|--------|-------------|
+| **Dashboard** | Summary stats (leads, missed, escalations, follow-ups due), quick action buttons, live activity feed |
+| **Leads** | All inbound leads with filter tabs (All / New / Qualified / Escalated), channel badges, tappable cards |
+| **Escalations** | Active escalation alerts with urgency indicator and per-card resolve button |
+| **Follow-ups** | Scheduled follow-up tasks sorted by due time, with mark-as-done action |
+| **Conversation Detail** | Full message thread, SOP match label, suggested response, status timeline — opens as stack screen from Leads or Escalations |
+
+Navigation is a bottom tab navigator (Home · Leads · Escalations · Follow-ups) with badge counts on the Escalations and Follow-ups tabs. Conversation Detail slides in as a stack screen on top.
 
 ---
 
-*Questions? Reach out — happy to walk through any decision in more detail.*
+### Component Architecture
+
+Every section of the UI is a standalone reusable component. No monolithic screen files. Screens are thin — they hold state and pass data down; components own rendering.
+
+```
+components/
+├── common/
+│   ├── ChannelBadge      WhatsApp (green) · Email (blue) · Call (amber)
+│   ├── StatusBadge       New (blue) · Qualified (green) · Escalated (red)
+│   └── EmptyState        Contextual empty list placeholder (no blank screens)
+├── dashboard/
+│   ├── StatCard          Metric card with value, icon, trend indicator
+│   └── ActivityItem      Single row in the activity feed
+├── leads/
+│   └── LeadCard          Tappable card with avatar, status, SOP tag, message preview
+├── escalations/
+│   └── EscalationCard    Urgency strip, reason box, resolve button
+└── followups/
+    └── FollowUpCard      Due time indicator, message preview, mark-as-done
+```
+
+Channel and status colours are defined once in `utils/theme.js` and consumed via `utils/helpers.js`. Changing a colour updates every screen simultaneously.
+
+---
+
+### Mock Data
+
+All mock data lives in `src/mock/` and is structured identically to what the backend API returns — same field names, same date formats (ISO 8601 UTC), same enum values. Replacing a mock import with a real `fetch()` call is the only change needed to wire up the live API. This was a deliberate choice to demonstrate API-readiness thinking.
+
+---
+
+### Styling
+
+React Native `StyleSheet` with a centralised design token file (`utils/theme.js`). All colours, font sizes, spacing values, border radii, and shadows are defined there and nowhere else.
+
+I chose StyleSheet over NativeWind because it requires no compiler, works out of the box with Expo, and the token file provides the same single-source-of-truth benefit that Tailwind's config would. For a prototype with one developer, the trade-off is clearly in favour of fewer moving parts.
+
+---
+
+## Known Limitations
+
+These are acknowledged trade-offs, not oversights.
+
+| Limitation | Production Fix |
+|-----------|----------------|
+| No authentication | JWT bearer tokens on every endpoint; login screen in the app |
+| No tenant isolation | Add `business_id` FK to `enquiries`, filter every query by it |
+| Follow-up scheduler stores the time but doesn't send | Celery Beat job polling `followup_due_at` on a schedule |
+| Frontend uses mock data | Replace mock imports with `fetch()` calls to the backend |
+| BackgroundTasks lost on server restart | Celery + Redis for persistent task queue |
+| SOP matching is keyword-based | Replace `sop_engine.py` with an LLM call or trained classifier |
+
+---
+
+## Tech Stack
+
+| Layer | Technology | Version |
+|-------|-----------|---------|
+| API Framework | FastAPI | 0.111 |
+| Server | Uvicorn | 0.29 |
+| ORM | SQLAlchemy | 2.0 |
+| Validation | Pydantic | 2.7 |
+| Database | SQLite (dev) / PostgreSQL (prod) | — |
+| Async Tasks | FastAPI BackgroundTasks | built-in |
+| Mobile Framework | React Native + Expo | 0.74 / SDK 51 |
+| Navigation | React Navigation | v6 |
+| Styling | StyleSheet + design tokens | built-in |
+
+---
+
+<div align="center">
+<sub>Built as part of the Closira Engineering Intern Assessment · Full-stack submission (Backend + Frontend)</sub>
+</div>
