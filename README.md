@@ -39,8 +39,6 @@ A short walkthrough covering:
 * Mobile dashboard functionality
 * Engineering trade-offs and architectural decisions
 
-🔗 **Walkthrough Video:** `https://drive.google.com/file/d/184u_86NbCZ3coaM06Uhjc22mA2Q9gG0G/view?usp=sharing`
-
 ---
 
 ## Project Highlights
