@@ -589,11 +589,3 @@ This project was built to demonstrate:
 The goal was not just to build features, but to build them in a way that remains maintainable, extensible, and production-aware.
 
 ---
-
-<div align="center">
-
-<sub>
-Built as part of the Closira Engineering Internship Assignment · Full-stack submission (Backend + Frontend)
-</sub>
-
-</div>
